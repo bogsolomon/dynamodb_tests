@@ -68,7 +68,7 @@ public class MapPopulate {
 		
 		//populate.generateData(args[0]);
 		
-		long startTime = System.currentTimeMillis();
+long startTime = System.currentTimeMillis();
 		
 		List<MapInfo> data = populate.getAllMaps();
 		
@@ -93,6 +93,18 @@ public class MapPopulate {
 		for (MapInfo mapInfo:data) {
 			System.out.println(mapInfo);
 		}
+		
+		System.out.println("------------------------------------------------------");
+		
+		startTime = System.currentTimeMillis();
+		
+		MapInfo info = populate.getMapById(22);
+		
+		endTime = System.currentTimeMillis();
+		
+		System.out.println("Single query: "+(endTime - startTime));
+		
+		System.out.println(info);
 	}
 
 	private void deleteTable() {
@@ -232,5 +244,9 @@ public class MapPopulate {
 		}
 		
 		return mapInfo;
+	}
+	
+	private MapInfo getMapById(int mapId) {
+		return mapper.load(MapInfo.class, mapId);
 	}
 }

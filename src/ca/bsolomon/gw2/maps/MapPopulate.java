@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import ca.bsolomon.gw2event.api.GW2EventsAPI;
+import ca.bsolomon.gw2event.api.dao.MapDetail;
 import ca.bsolomon.gw2events.level.dynamodb.model.MapInfo;
 
 import com.amazonaws.AmazonServiceException;
@@ -21,6 +23,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedScanList;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper.FailedBatch;
 import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ComparisonOperator;
@@ -58,17 +61,41 @@ public class MapPopulate {
 			e.printStackTrace();
 		}
 		
-		if (Boolean.parseBoolean(args[1]) && populate.tableExists()) {
-			populate.deleteTable();
-		}
+		populate.deleteTable();
 		
 		if (!populate.tableExists()) {
 			populate.createTable();
 		}
 		
-		//populate.generateData(args[0]);
+		GW2EventsAPI gw2Api = new GW2EventsAPI();
+		Map<String, MapDetail> maps = gw2Api.queryMapDetails().getMaps().get(0);
 		
-long startTime = System.currentTimeMillis();
+		List<MapInfo> mapsToAdd = new ArrayList<>();
+		
+		for (String mapId:maps.keySet()) {
+			Integer mapIdInt = Integer.parseInt(mapId);
+			
+			if (populate.getMapById(mapIdInt) == null) {
+				MapInfo info = new MapInfo();
+				info.setMapId(mapIdInt);
+				info.setLowLevelRange(maps.get(mapId).getMinLevel());
+				info.setHighLevelRange(maps.get(mapId).getMaxLevel());
+				
+				mapsToAdd.add(info);
+				
+				if (mapsToAdd.size() == 25) {
+					populate.batchAddMaps(mapsToAdd);
+					
+					mapsToAdd.clear();
+				}
+			}
+		}
+		
+		populate.batchAddMaps(mapsToAdd);
+		
+		System.out.println("New data inserted");
+		
+		long startTime = System.currentTimeMillis();
 		
 		List<MapInfo> data = populate.getAllMaps();
 		
@@ -105,6 +132,19 @@ long startTime = System.currentTimeMillis();
 		System.out.println("Single query: "+(endTime - startTime));
 		
 		System.out.println(info);
+	}
+
+	private void addMap(MapInfo info) {
+		mapper.save(info);
+	}
+	
+	private void batchAddMaps(List<MapInfo> infos) {
+		List<FailedBatch> failed = mapper.batchSave(infos);
+		
+		if (failed.size() > 0) {
+			System.out.println(failed.size()+" items failed to save.");
+			System.out.println(failed.get(0).getException());
+		}
 	}
 
 	private void deleteTable() {
